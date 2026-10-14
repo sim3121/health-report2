@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>Health Detective</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+/* Layout: 건강검진 센터 차트처럼, 상단 진행 레일 + 한 화면 한 단계 스테이지 + 하단 이전/다음 */
+:root{
+  --bg:#EAF5F0; --paper:#FFFFFF; --ink:#16362F; --muted:#557269; --line:#C9E2D9;
+  --mint:#14967B; --mint-soft:#D3F0E7; --coral:#EE6346; --coral-soft:#FDE2DA;
+  --sun:#F2B035; --sun-soft:#FFF0CC; --sky:#3B82C4; --sky-soft:#DCEBF8;
+  --ok:#23915A; --ok-soft:#DDF4E6; --warn:#B7791F; --warn-soft:#FDF0D5; --bad:#C9402F; --bad-soft:#FBE1DC;
+  --f-display:'Jua','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  --f-body:'Gowun Dodum','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  --f-en:'Nunito','Segoe UI',Roboto,Arial,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{margin:0}
+[hidden]{display:none!important}
+body{font-family:var(--f-body);font-size:17px;line-height:1.55;padding-inline:16px;padding-block:0 32px}
+button{font:inherit;color:inherit;cursor:pointer;border:none;background:none}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+input,textarea{font:inherit;color:var(--ink)}
+.en{font-family:var(--f-en);font-weight:800;letter-spacing:.005em}
+.wrap{max-width:1120px;margin:0 auto}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:12px 10px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;border-bottom:2px dashed var(--line)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.cross{width:38px;height:38px;border-radius:10px;background:var(--coral);display:grid;place-items:center;flex:none}
+.cross::before{content:"";width:18px;height:18px;background:
+  linear-gradient(#fff,#fff) center/6px 18px no-repeat,linear-gradient(#fff,#fff) center/18px 6px no-repeat}
+.brand b{font-family:var(--f-display);font-size:22px;font-weight:400;line-height:1.1;display:block}
+.brand small{color:var(--muted);font-size:13px}
+.rail{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.dot{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--paper);border:2px solid var(--line);font-size:13px;color:var(--muted)}
+.dot i{font-style:normal;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--line);color:var(--ink);font-family:var(--f-en);font-weight:900;font-size:12px}
+.dot.on{border-color:var(--mint);color:var(--ink);background:var(--mint-soft)}
+.dot.on i{background:var(--mint);color:#fff}
+.dot.done i{background:var(--ok);color:#fff}
+.dot[disabled]{opacity:.55;cursor:default}
+.lvchip{padding:6px 12px;border-radius:999px;font-size:14px;border:2px solid var(--line);background:var(--paper)}
+
+/* stage */
+.stage{padding-block:18px 0}
+.head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 14px;margin-bottom:14px}
+.head h1{font-family:var(--f-display);font-weight:400;font-size:clamp(24px,3.2vw,32px);margin:0;line-height:1.15;text-wrap:balance}
+.head p{margin:0;color:var(--muted)}
+.tag{font-family:var(--f-en);font-weight:900;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--coral);background:var(--coral-soft);padding:3px 8px;border-radius:6px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px}
+@media (max-width:860px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--paper);border-radius:18px;padding:18px;border:2px solid var(--line);min-width:0}
+.card h2{font-family:var(--f-display);font-weight:400;font-size:21px;margin:0 0 10px}
+.card .sub{color:var(--muted);font-size:15px;margin:-4px 0 12px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:12px;background:var(--paper);border:2px solid var(--line);font-size:16px;transition:transform .08s}
+.btn:active{transform:translateY(1px)}
+.btn.main{background:var(--mint);border-color:var(--mint);color:#fff}
+.btn.coral{background:var(--coral);border-color:var(--coral);color:#fff}
+.btn.sm{padding:6px 10px;font-size:14px;border-radius:10px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.icon{width:44px;height:44px;border-radius:12px;display:inline-grid;place-items:center;background:var(--sky-soft);border:2px solid transparent;font-size:20px;flex:none}
+.icon.mic{background:var(--coral-soft)}
+.icon.live{background:var(--coral);color:#fff;animation:pulse 1s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 8px rgba(238,99,70,.18)}}
+
+/* home */
+.hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px;align-items:stretch}
+@media (max-width:860px){.hero{grid-template-columns:minmax(0,1fr)}}
+.chart{background:var(--paper);border:2px solid var(--line);border-radius:20px;padding:22px;position:relative;overflow:hidden}
+.chart::after{content:"";position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;background:var(--mint-soft)}
+.chart h1{font-family:var(--f-display);font-weight:400;font-size:clamp(28px,4vw,42px);line-height:1.15;margin:6px 0 10px;position:relative;z-index:1;text-wrap:balance}
+.chart p{margin:0 0 8px;color:var(--muted);position:relative;z-index:1}
+.ecg{display:block;width:100%;height:46px;margin:10px 0 4px}
+.ecg path{fill:none;stroke:var(--coral);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:600;stroke-dashoffset:600;animation:ecg 2.4s ease-out forwards}
+@keyframes ecg{to{stroke-dashoffset:0}}
+.levels{display:grid;gap:10px}
+.lv{display:flex;gap:14px;align-items:center;text-align:left;padding:14px 16px;border-radius:16px;background:var(--paper);border:3px solid var(--line)}
+.lv .em{font-size:34px;flex:none}
+.lv b{font-family:var(--f-display);font-weight:400;font-size:20px;display:block}
+.lv span{color:var(--muted);font-size:14px}
+.lv.sel{border-color:var(--mint);background:var(--mint-soft)}
+.note{font-size:14px;color:var(--muted);display:flex;gap:8px;align-items:flex-start}
+
+/* discovery */
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cal .d{font-family:var(--f-en);font-weight:900;font-size:13px;text-align:center;color:var(--muted)}
+.cell{aspect-ratio:1;max-width:100%;border-radius:12px;border:3px solid var(--line);background:#fff;display:grid;place-items:center;font-size:26px;color:var(--mint)}
+.cell.on{background:var(--mint-soft);border-color:var(--mint)}
+.big{font-size:clamp(22px,3vw,30px);line-height:1.35}
+.hl{background:var(--sun-soft);border-bottom:4px solid var(--sun);padding:0 6px;border-radius:6px;color:var(--coral)}
+.rules{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:16px}
+.rules div{padding:4px 8px;border-radius:8px}
+.rules .k{font-family:var(--f-en);font-weight:900;text-align:right}
+.rules .cur{background:var(--sun-soft)}
+.q{padding:12px;border-radius:14px;background:var(--bg)}
+.q p{margin:0 0 8px}
+.opt{padding:8px 14px;border-radius:12px;background:#fff;border:2px solid var(--line)}
+.opt.right{background:var(--ok-soft);border-color:var(--ok)}
+.opt.wrong{background:var(--bad-soft);border-color:var(--bad)}
+
+/* report rows */
+.rep{display:flex;flex-direction:column;gap:10px}
+.rrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px;border-radius:14px;background:var(--bg)}
+.rrow.active{background:var(--sun-soft)}
+.emo{font-size:30px;width:46px;text-align:center}
+.boxes{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px}
+.boxes i{width:14px;height:14px;border-radius:3px;border:2px solid var(--line);background:#fff}
+.boxes i.f{background:var(--coral);border-color:var(--coral)}
+.boxes em{font-style:normal;font-family:var(--f-en);font-weight:800;font-size:12px;color:var(--muted);margin-left:4px}
+.sent{font-size:19px}
+.markrow{display:flex;gap:6px}
+.mk{width:40px;height:36px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:18px}
+.mk.on{border-color:var(--sky);background:var(--sky-soft)}
+
+/* survey */
+.srow{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border-radius:16px;border:2px solid var(--line);background:#fff}
+.srow.off{opacity:.55}
+.srow .tg{width:30px;height:30px;border-radius:8px;border:3px solid var(--line);display:grid;place-items:center;font-size:16px}
+.srow.onrow .tg{background:var(--mint);border-color:var(--mint);color:#fff}
+.chk{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.chk button{width:34px;height:34px;border-radius:9px;border:3px solid var(--line);background:#fff;font-size:16px;color:#fff}
+.chk button.f{background:var(--coral);border-color:var(--coral)}
+.chk .zero{width:auto;padding:0 10px;color:var(--muted);font-size:13px}
+.chk .zero.f{color:#fff}
+.per{font-family:var(--f-en);font-weight:900;color:var(--sky);font-size:15px;white-space:nowrap}
+.cnt{font-family:var(--f-display);font-size:20px;min-width:58px;text-align:right}
+@media (max-width:640px){.srow{grid-template-columns:auto auto minmax(0,1fr)}.srow .cnt{grid-column:3}}
+
+/* writing */
+.wcard{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px;padding:14px;border-radius:18px;border:2px solid var(--line);background:#fff}
+.wcard.ok{border-color:var(--ok);background:linear-gradient(0deg,var(--ok-soft),#fff 60%)}
+@media (max-width:640px){.wcard{grid-template-columns:minmax(0,1fr)}}
+.cue{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.cue .emo{font-size:40px;width:auto}
+.cue b{font-family:var(--f-display);font-weight:400;font-size:18px}
+.slots{min-height:54px;display:flex;flex-wrap:wrap;gap:6px;padding:8px;border-radius:12px;border:2px dashed var(--line);background:var(--bg);align-items:center}
+.slots:empty::before{content:"아래 블록을 순서대로 눌러요";color:var(--muted);font-size:14px}
+.tile{padding:8px 12px;border-radius:10px;background:var(--sky-soft);border:2px solid var(--sky);font-family:var(--f-en);font-weight:800;font-size:17px}
+.tile.used{opacity:.25;pointer-events:none}
+.tile.p{background:#fff}
+.frame{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:19px}
+.frame input{width:170px;max-width:100%;padding:8px 10px;border-radius:10px;border:2px solid var(--sky);font-family:var(--f-en);font-weight:800;font-size:18px}
+.seg{display:inline-flex;border:2px solid var(--sky);border-radius:10px;overflow:hidden}
+.seg button{padding:7px 12px;font-family:var(--f-en);font-weight:800}
+.seg button.on{background:var(--sky);color:#fff}
+textarea.free{width:100%;min-height:58px;resize:vertical;padding:10px 12px;border-radius:12px;border:2px solid var(--sky);font-family:var(--f-en);font-weight:800;font-size:18px}
+.fb{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:12px;font-size:15px}
+.fb.hint{background:var(--warn-soft)}
+.fb.good{background:var(--ok-soft)}
+.fb .bot{flex:none;font-size:20px}
+.done{font-size:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* speech result */
+.heard{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:15px}
+.w{font-family:var(--f-en);font-weight:800;padding:2px 7px;border-radius:7px}
+.w.y{background:var(--ok-soft);color:var(--ok)}
+.w.n{background:var(--bad-soft);color:var(--bad)}
+.score{font-family:var(--f-display);font-size:17px;margin-left:6px}
+.raw{color:var(--muted);font-size:13px;width:100%}
+
+/* coach */
+.coach{display:grid;grid-template-columns:64px minmax(0,1fr);gap:14px}
+.botav{width:64px;height:64px;border-radius:18px;background:var(--mint);display:grid;place-items:center;font-size:34px}
+.diag{display:flex;flex-direction:column;gap:8px}
+.diag div{padding:10px 12px;border-radius:12px;background:var(--bg);animation:in .4s both}
+.diag div.need{background:var(--warn-soft)}
+.diag div.good{background:var(--ok-soft)}
+@keyframes in{from{opacity:.0;transform:translateY(6px)}}
+.sug{display:flex;flex-direction:column;gap:8px}
+.sug button{text-align:left;padding:12px 14px;border-radius:12px;border:2px solid var(--line);background:#fff;font-size:18px}
+.sug button.on{border-color:var(--mint);background:var(--mint-soft)}
+
+/* final report */
+.paper{background:#fff;border-radius:20px;border:2px solid var(--line);padding:22px;position:relative}
+.paper .clip{position:absolute;top:-12px;left:50%;transform:translateX(-50%);width:110px;height:24px;border-radius:8px;background:var(--line)}
+.ptitle{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;border-bottom:3px solid var(--ink);padding-bottom:8px;margin-bottom:12px}
+.ptitle h2{font-family:var(--f-en);font-weight:900;font-size:28px;margin:0}
+.ptitle input{border:none;border-bottom:2px dashed var(--line);font-family:var(--f-en);font-weight:800;font-size:16px;width:180px;max-width:100%;background:transparent;padding:2px 4px}
+.noteline{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--sun-soft);font-size:19px}
+.noteline b{font-family:var(--f-en);color:var(--coral)}
+.stars{display:flex;gap:2px}
+.stars button{font-size:24px;filter:grayscale(1);opacity:.35}
+.stars button.on{filter:none;opacity:1}
+.chkrow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+.chkrow:last-child{border-bottom:none}
+
+/* gallery overlay & teacher */
+.over{position:fixed;inset:0;z-index:50;background:var(--bg);overflow:auto;padding:max(16px,env(safe-area-inset-top,0px)) 16px 24px}
+.over .x{position:fixed;top:12px;right:12px;z-index:2}
+.gal .paper{max-width:900px;margin:12px auto}
+.gal .sent{font-size:clamp(20px,2.6vw,28px)}
+.stick{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:900px;margin:0 auto}
+.stk{padding:12px 18px;border-radius:999px;background:#fff;border:3px solid var(--sun);font-family:var(--f-en);font-weight:900;font-size:19px;display:flex;gap:8px;align-items:center}
+.stk em{font-style:normal;background:var(--sun);color:var(--ink);border-radius:999px;padding:0 9px;font-size:15px}
+.dice{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;max-width:980px;margin:20px auto}
+@media (max-width:700px){.dice{grid-template-columns:minmax(0,1fr)}}
+.die{background:#fff;border:4px solid var(--ink);border-radius:26px;padding:18px;text-align:center;min-height:180px;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.die .lab{font-size:15px;color:var(--muted)}
+.die .face{font-family:var(--f-en);font-weight:900;font-size:clamp(28px,4vw,44px);line-height:1.1}
+.die .face small{display:block;font-size:46px}
+.die.roll{animation:shake .12s infinite}
+@keyframes shake{50%{transform:rotate(3deg) scale(1.02)}}
+.answer{max-width:980px;margin:0 auto;text-align:center}
+.answer .big{font-size:clamp(28px,4vw,46px)}
+
+.navbar{position:sticky;bottom:0;z-index:15;display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:18px;padding-block:12px calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:2px dashed var(--line);flex-wrap:nowrap}
+.todo{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center}
+.tlabel{width:100%;text-align:center;font-size:14px;color:var(--muted)}
+.tlabel b{color:var(--coral)}
+.tchip{padding:5px 10px;border-radius:999px;border:2px solid var(--coral);background:var(--coral-soft);font-size:14px}
+.tchip.y{border-color:var(--line);background:#fff;color:var(--muted)}
+.btn.locked{background:var(--line);border-color:var(--line);color:var(--muted)}
+.attn{outline:4px solid var(--coral);outline-offset:4px;animation:attn .8s 3}
+@keyframes attn{50%{box-shadow:0 0 0 10px rgba(238,99,70,.35)}}
+.retry{margin:8px 0 0;font-size:14px;color:var(--bad)}
+.retry.ok{color:var(--ok)}
+.ghead{font-family:var(--f-display);font-size:19px;margin-top:6px;display:flex;gap:8px;align-items:center}
+.ghead .en{background:var(--sky-soft);color:var(--sky);padding:2px 10px;border-radius:8px;font-size:15px}
+.pickcount{margin:0;padding:10px 14px;border-radius:12px;background:var(--coral-soft);font-size:16px}
+.pickcount.okc{background:var(--ok-soft)}
+.waitcard{border-color:var(--mint);background:linear-gradient(180deg,var(--mint-soft),#fff 70%)}
+.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
+a.btn{text-decoration:none;justify-content:center}
+.jb{display:inline-block;font-size:13px;border-radius:999px;padding:1px 9px;margin-top:4px;background:var(--bg);color:var(--muted)}
+.jb.ok{background:var(--ok-soft);color:var(--ok)}
+.jb.need{background:var(--coral-soft);color:var(--coral)}
+.noteline.rrow{margin-top:0}
+.credit{position:relative;z-index:1;margin:16px 0 0;padding-top:10px;border-top:1px dashed var(--line);font-size:12.5px;color:var(--muted)}
+.mine{font-size:12px;background:var(--sun-soft);border-radius:6px;padding:1px 6px}
+.ask{font-size:15px;color:var(--coral)}
+@media (max-width:640px){.navbar{flex-wrap:wrap}.todo{order:-1;width:100%;flex:none}}
+.why{color:var(--muted);font-size:14px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:12px;z-index:80;font-size:15px;max-width:calc(100% - 32px);text-align:center}
+.burst{position:fixed;inset:0;pointer-events:none;z-index:90;overflow:hidden}
+.burst span{position:absolute;font-size:26px;animation:fly 1.1s ease-out forwards}
+@keyframes fly{to{transform:translate(var(--dx),var(--dy)) rotate(200deg);opacity:0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.ecg path{stroke-dashoffset:0}}
+</style>
+<style>
+/* Health Detective: 같은 스튜디오 토큰 + 자리표·기록지 조각·처방전 */
+.cross{background:var(--ink)}
+.cross::before{content:"🔎";background:none;width:auto;height:auto;font-size:20px;line-height:1}
+.seatmap{display:grid;grid-template-columns:28px repeat(5,minmax(0,1fr));gap:8px;align-items:center;max-width:560px;margin:0 auto;width:100%}
+.seatmap .lab{font-size:12px;color:var(--muted);text-align:center}
+.seat{aspect-ratio:1.45;max-width:100%;border-radius:10px;border:2px solid var(--line);background:var(--mint-soft);font-family:var(--f-en);font-weight:900;font-size:clamp(15px,2.4vw,20px);display:grid;place-items:center;position:relative;color:var(--ink)}
+.seat.empty{background:repeating-linear-gradient(45deg,var(--paper),var(--paper) 6px,var(--line) 6px,var(--line) 9px);color:var(--muted)}
+.seat.empty::after{content:"✕";position:absolute;font-size:28px;color:var(--bad);opacity:.6}
+.seat.me{background:var(--coral);border-color:var(--coral);color:#fff}
+.seat.off{opacity:.3;cursor:default}
+.seat.mark{background:var(--ok);border-color:var(--ok);color:#fff}
+.seat.pick{background:var(--sun);border-color:var(--ink)}
+.seat.res{background:var(--paper);border-color:var(--sky)}
+.seat small{position:absolute;top:1px;right:5px;font-size:12px}
+.board{grid-column:2 / -1;text-align:center;padding:7px;border-radius:8px;background:var(--line);font-size:14px;color:var(--ink)}
+.codebig{font-family:var(--f-en);font-weight:900;font-size:clamp(46px,9vw,92px);letter-spacing:.14em;line-height:1;text-align:center;color:var(--ink)}
+.codein{font-family:var(--f-en);font-weight:900;font-size:32px;letter-spacing:.25em;text-align:center;width:min(280px,100%);padding:10px;border-radius:14px;border:3px solid var(--sky)}
+.piece{position:relative;background:var(--paper);border:2px solid var(--ink);border-radius:6px 18px 6px 18px;padding:18px;box-shadow:6px 6px 0 var(--sun)}
+.piece .torn{position:absolute;right:-2px;top:16px;bottom:16px;width:14px;background:radial-gradient(circle at 100% 50%,var(--bg) 6px,transparent 7px) 0 0/14px 18px repeat-y}
+.piece .big{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.piece .big b{font-family:var(--f-display);font-weight:400;font-size:clamp(24px,3vw,32px)}
+.dots{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center}
+.dots i{width:16px;height:16px;border-radius:4px;border:2px solid var(--line);background:var(--paper)}
+.dots i.f{background:var(--coral);border-color:var(--coral)}
+.dots em{font-style:normal;font-size:13px;color:var(--muted);margin-left:4px}
+.idcard{display:flex;flex-direction:column;gap:8px}
+.hrow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border-radius:14px;background:var(--bg)}
+.hrow .emo{font-size:30px;width:auto}
+.hrow b{font-family:var(--f-display);font-weight:400;font-size:19px}
+.hrow .n{font-family:var(--f-display);font-size:19px;white-space:nowrap}
+.hrow.warn{background:var(--warn-soft)}
+.hrow.goodr{background:var(--ok-soft)}
+button.hrow{width:100%;text-align:left;border:3px solid transparent}
+button.hrow.on{border-color:var(--coral)}
+.hintbox{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:2px dashed var(--line)}
+.hintbox .hv{padding:10px 12px;border-radius:12px;background:var(--sun-soft);font-size:16px}
+.hintbtn{align-self:flex-start;padding:9px 16px;border-radius:999px;background:var(--sun-soft);border:2px solid var(--sun);font-size:15px}
+.hintbtn[disabled]{opacity:.5;cursor:default}
+.steps li b{font-family:var(--f-display);font-weight:400}
+.verdict{padding:12px 14px;border-radius:14px;font-size:16px}
+.verdict.ok{background:var(--ok-soft)}
+.verdict.no{background:var(--bad-soft)}
+.verdict.mid{background:var(--warn-soft)}
+.reveal{text-align:center;padding:20px;border-radius:20px;background:var(--ink);color:#fff}
+.reveal .num{font-family:var(--f-en);font-weight:900;font-size:64px;line-height:1;color:var(--sun)}
+.reveal p{margin:6px 0 0}
+.rolebar{display:flex;flex-wrap:wrap;gap:10px}
+.role{flex:1 1 240px;padding:14px 16px;border-radius:16px;font-size:clamp(18px,2.4vw,26px);font-family:var(--f-display)}
+.role.d{background:var(--ink);color:#fff}
+.role.r{background:var(--paper);border:3px solid var(--sky)}
+.teamlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.team{padding:12px;border-radius:14px;background:var(--paper);border:2px solid var(--line)}
+.team b{font-family:var(--f-display);font-weight:400;font-size:20px}
+.team .mem{font-family:var(--f-en);font-weight:900;font-size:22px}
+.timer{font-family:var(--f-en);font-weight:900;font-size:clamp(40px,7vw,72px);font-variant-numeric:tabular-nums;line-height:1}
+.timer.low{color:var(--coral)}
+.rx{background:var(--paper);border:2px solid var(--ink);border-radius:18px;padding:20px;position:relative}
+.rx h2{font-family:var(--f-en);font-weight:900;font-size:26px;margin:0}
+.rx .rxmark{font-family:Georgia,serif;font-size:44px;font-weight:700;color:var(--coral);line-height:1}
+.rx .line{font-family:var(--f-en);font-weight:800;font-size:20px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.stamp{position:absolute;right:18px;top:56px;transform:rotate(-12deg);border:4px solid var(--coral);color:var(--coral);border-radius:12px;padding:4px 12px;font-family:var(--f-en);font-weight:900;font-size:20px}
+.sline{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:16px;border:2px solid var(--line);background:var(--paper)}
+.sline.ok{border-color:var(--ok);background:linear-gradient(0deg,var(--ok-soft),var(--paper) 60%)}
+.sline .ko{font-size:17px}
+.bigmic{width:72px;height:72px;font-size:32px;border-radius:20px}
+.linkish{background:none;border:none;color:var(--sky);text-decoration:underline;font-size:14px;padding:0}
+.confirm{padding:12px;border-radius:12px;background:var(--bad-soft)}
+.jointop{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}
+@media (max-width:860px){.jointop{grid-template-columns:minmax(0,1fr)}}
+.meter{height:16px;border-radius:999px;background:var(--bg);border:2px solid var(--line);overflow:hidden}
+.meter span{display:block;height:100%;background:linear-gradient(90deg,var(--sun),var(--coral));border-radius:999px;transition:width .4s}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="cross" aria-hidden="true"></span><div><b>Health Detective</b><small>Lesson 10 · 미스터리 환자를 찾아라</small></div></div>
+    <nav class="tabs" id="rail" aria-label="활동 단계"></nav>
+  </header>
+  <main class="stage" id="app"></main>
+</div>
+
+<script>
+/* ===================== 기본 설정 ===================== */
+const COLS=5,ROWS=4,SEATS=20,SEEDS=40,MAXABS=6,ROUND_SEC=480;
+const NUM=['zero','one','two','three','four','five','six','seven','eight','nine','ten'];
+const HABITS=[
+  {id:'brush',ko:'이 닦기',kov:'이를 닦아요',en:'brush my teeth',you:'brush your teeth',per:'day',emo:'🪥',vals:[1,2,3],good:n=>n>=3,
+   tip:'이는 하루 3번 닦아야 충치를 막아요.',should:'You should brush your teeth three times a day.',shouldKo:'하루에 3번 이를 닦아야 해요.',
+   tiles:['You','should','brush your teeth','three times','a day.'],key:'brush your teeth / three times'},
+  {id:'wash',ko:'손 씻기',kov:'손을 씻어요',en:'wash my hands',you:'wash your hands',per:'day',emo:'🧼',vals:[2,4,6],good:n=>n>=5,
+   tip:'손은 하루 5번 이상 씻어야 감기를 막아요.',should:'You should wash your hands five times a day.',shouldKo:'하루에 5번 손을 씻어야 해요.',
+   tiles:['You','should','wash your hands','five times','a day.'],key:'wash your hands / five times'},
+  {id:'breakfast',ko:'아침 먹기',kov:'아침을 먹어요',en:'eat breakfast',you:'eat breakfast',per:'week',emo:'🍳',vals:[3,5,7],good:n=>n>=7,
+   tip:'아침은 매일 먹어야 오전에 힘이 나요.',should:'You should eat breakfast every day.',shouldKo:'매일 아침을 먹어야 해요.',
+   tiles:['You','should','eat breakfast','every day.'],key:'eat breakfast / every day'},
+  {id:'exercise',ko:'운동하기',kov:'운동해요',en:'exercise',you:'exercise',per:'week',emo:'🏃',vals:[1,3,5],good:n=>n>=5,
+   tip:'운동은 일주일에 5번 이상 하면 튼튼해져요.',should:'You should exercise every day.',shouldKo:'매일 운동해야 해요.',
+   tiles:['You','should','exercise','every day.'],key:'exercise / every day'},
+  {id:'fastfood',ko:'패스트푸드 먹기',kov:'패스트푸드를 먹어요',en:'eat fast food',you:'eat fast food',per:'week',emo:'🍔',vals:[1,2,4],good:n=>n<=1,
+   tip:'패스트푸드는 일주일에 1번 이하가 좋아요.',should:'You should eat fresh fruits and vegetables.',shouldKo:'신선한 과일과 채소를 먹어야 해요.',
+   tiles:['You','should','eat fresh fruits','and vegetables.'],key:'eat fresh fruits and vegetables'},
+  {id:'shower',ko:'샤워하기',kov:'샤워해요',en:'take a shower',you:'take a shower',per:'week',emo:'🚿',vals:[3,5,7],good:n=>n>=5,
+   tip:'샤워는 일주일에 5번 이상 하면 몸이 깨끗해요.',should:'You should take a shower every day.',shouldKo:'매일 샤워해야 해요.',
+   tiles:['You','should','take a shower','every day.'],key:'take a shower / every day'},
+  {id:'walk',ko:'산책하기',kov:'산책해요',en:'take a walk',you:'take a walk',per:'week',emo:'🚶',vals:[1,3,5],good:n=>n>=3,
+   tip:'일주일에 3번 이상 걸으면 몸과 마음이 상쾌해요.',should:'You should take a walk three times a week.',shouldKo:'일주일에 3번 산책해야 해요.',
+   tiles:['You','should','take a walk','three times','a week.'],key:'take a walk / three times'},
+  {id:'bike',ko:'자전거 타기',kov:'자전거를 타요',en:'ride a bike',you:'ride a bike',per:'week',emo:'🚲',vals:[1,2,4],good:n=>n>=3,
+   tip:'자전거를 일주일에 3번 이상 타면 다리가 튼튼해져요.',should:'You should ride a bike three times a week.',shouldKo:'일주일에 3번 자전거를 타야 해요.',
+   tiles:['You','should','ride a bike','three times','a week.'],key:'ride a bike / three times'}];
+const HB=Object.fromEntries(HABITS.map(h=>[h.id,h]));
+const LETTERS=['A','B','C','D'],TEMO={A:'🅰️',B:'🅱️',C:'©️',D:'🇩'};
+
+const freq=n=>n===1?'once':n===2?'twice':NUM[n]+' times';
+const perKo=p=>p==='day'?'하루에':'일주일에';
+const qOf=h=>`How often do you ${h.you}?`;
+const aOf=(h,n)=>`I ${h.en} ${freq(n)} a ${h.per}.`;
+const dxOf=(h,n)=>`You ${h.you} ${freq(n)} a ${h.per}.`;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dots=(n,per)=>`<span class="dots">${Array.from({length:7},(_,i)=>`<i class="${i<n?'f':''}"></i>`).join('')}<em>/ a ${per}</em></span>`;
+
+/* ===================== 입장 코드: 빈자리 + 사건 번호를 숫자 하나로 ===================== */
+const COMBOS=(()=>{const out=[];for(let k=0;k<=MAXABS;k++){const rec=(s,acc)=>{if(acc.length===k){out.push(acc.slice());return}for(let i=s;i<=SEATS;i++){acc.push(i);rec(i+1,acc);acc.pop()}};rec(1,[])}return out})();
+const RANK=new Map(COMBOS.map((c,i)=>[c.join(','),i]));
+function luhn(s){let sum=0,dbl=true;for(let i=s.length-1;i>=0;i--){let d=+s[i];if(dbl){d*=2;if(d>9)d-=9}sum+=d;dbl=!dbl}return(10-sum%10)%10}
+function makeCode(absent,seed){const r=RANK.get(absent.slice().sort((a,b)=>a-b).join(','));const base=String(100+r*SEEDS+seed);return base+luhn(base)}
+function readCode(c){c=String(c).replace(/\D/g,'');if(c.length<4)return null;const base=c.slice(0,-1);if(luhn(base)!==+c.slice(-1))return null;
+  const b=+base-100;if(b<0)return null;const r=Math.floor(b/SEEDS);if(r>=COMBOS.length)return null;return{code:c,base:b,seed:b%SEEDS,absent:COMBOS[r]}}
+const spaced=c=>c.length>4?c.slice(0,c.length-3)+' '+c.slice(-3):c;
+
+/* ===================== 사건 만들기 (모든 크롬북이 같은 계산) ===================== */
+function rng(seed){let a=seed>>>0;return()=>{a=a+0x6D2B79F5>>>0;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+const rowOf=n=>Math.floor((n-1)/COLS),colOf=n=>(n-1)%COLS;
+const snake=n=>{const r=rowOf(n),c=colOf(n);return r*COLS+(r%2?COLS-1-c:c)};
+function chunk(w){const n=w.length;if(n<=5)return[w];const t=Math.floor(n/3),out=[];let i=0;
+  for(let k=0;k<t;k++){const sz=3+((k>=t-(n-3*t))?1:0);out.push(w.slice(i,i+sz));i+=sz}return out}
+function shuffle(a,R){for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+/* 역할은 행으로: 1라운드 1·2행 탐정(1행→3행, 2행→4행 조사), 2라운드 3·4행 탐정(3행→1행, 4행→2행 조사)
+   한 행 = A(1~3열 3명) + B(4·5열 2명) 두 모둠. 탐정 1명 = 조각 2개 */
+const detRows=round=>round===1?[0,1]:[2,3];
+const isDet=(seat,round)=>detRows(round).includes(rowOf(seat));
+const myDetRound=seat=>rowOf(seat)<2?1:2;
+const poolRow=r=>(r+2)%4;
+const rowSeats=r=>[1,2,3,4,5].map(k=>r*COLS+k);
+const rowTxt=r=>`${r+1}행 (${r*COLS+1}~${r*COLS+5}번)`;
+const rowsTxt=rs=>rs.map(r=>r+1).join('·')+'행';
+const CACHE={};
+function gen(G,round){
+  const key=G.base+'-'+round;if(CACHE[key])return CACHE[key];
+  const absent=new Set(G.absent),present=[];for(let i=1;i<=SEATS;i++)if(!absent.has(i))present.push(i);
+  const walkers=present.filter(n=>isDet(n,round)),residents=present.filter(n=>!isDet(n,round));
+  // 모둠 만들기 (행마다 A/B, 1명만 남으면 같은 행 모둠과 합치기)
+  const groups=[];
+  detRows(round).forEach((r,ri)=>{
+    const seats=rowSeats(r).filter(n=>!absent.has(n));
+    let g=[{l:LETTERS[ri*2],m:seats.filter(n=>colOf(n)<3)},{l:LETTERS[ri*2+1],m:seats.filter(n=>colOf(n)>=3)}].filter(x=>x.m.length);
+    if(g.length===2&&g.some(x=>x.m.length===1))g=[{l:g[0].l,m:g[0].m.concat(g[1].m).sort((a,b)=>a-b)}];
+    const pool=rowSeats(poolRow(r)).filter(n=>!absent.has(n));
+    g.forEach(x=>groups.push({letter:x.l,row:r,members:x.m,pool}));
+  });
+  const bad=groups.find(g=>g.pool.length<3);
+  if(!walkers.length||bad)return CACHE[key]={error:bad?`${round}라운드에 ${rowTxt(poolRow(bad.row))} 주민이 ${bad.pool.length}명뿐이에요. 다른 행 학생 1~2명을 그 행의 빈자리로 옮겨 앉게 하고, 빈자리 표시를 다시 해 주세요.`:'탐정이 없어요.',walkers,residents,present};
+  for(let att=0;att<8000;att++){
+    const R=rng((Math.imul(G.base+1,2654435761)^Math.imul(round,40503)^Math.imul(att+1,97))>>>0);
+    const pick=a=>a[Math.floor(R()*a.length)];
+    const cards={};residents.forEach(r=>{cards[r]={};HABITS.forEach(h=>cards[r][h.id]=pick(h.vals))});
+    const used=new Set(),teams=[];let ok=true;
+    const lo=att<6000?2:1;
+    for(const gp of groups){
+      const mem=gp.members,P=gp.pool;let done=null;
+      for(let t=0;t<120&&!done;t++){
+        const cand=P.filter(r=>!used.has(r)&&HABITS.some(h=>!h.good(cards[r][h.id])));
+        if(!cand.length)break;
+        const target=pick(cand),hs=shuffle(HABITS.slice(),R);
+        const clues=mem.map((m,i)=>{const a=hs[(2*i)%8],b=hs[(2*i+1)%8];return{member:m,habits:[{habit:a.id,n:cards[target][a.id]},{habit:b.id,n:cards[target][b.id]}]}});
+        clues.forEach(c=>c.matches=P.filter(r=>c.habits.every(x=>cards[r][x.habit]===x.n)));
+        if(mem.length>1&&clues.some(c=>c.matches.length<lo))continue;
+        const inter=P.filter(r=>clues.every(c=>c.matches.includes(r)));
+        if(inter.length!==1)continue;
+        done={target,clues};
+      }
+      if(!done){ok=false;break}
+      used.add(done.target);teams.push({letter:gp.letter,row:gp.row,poolRow:poolRow(gp.row),pool:gp.pool,members:mem,...done});
+    }
+    if(ok)return CACHE[key]={walkers,residents,present,cards,teams};
+  }
+  return CACHE[key]={error:'사건을 만들지 못했어요. 🎲 새 사건 만들기를 눌러 주세요.',walkers,residents,present};
+}
+
+/* ===================== 음성: TTS / STT ===================== */
+let voices=[];
+function loadVoices(){try{voices=speechSynthesis.getVoices()}catch(e){}}
+if('speechSynthesis' in window){loadVoices();speechSynthesis.onvoiceschanged=loadVoices}
+function pickVoice(){return voices.find(v=>/Google US English/i.test(v.name))||voices.find(v=>v.lang==='en-US')||voices.find(v=>/^en/i.test(v.lang))}
+function speak(t,rate=.88){if(!('speechSynthesis' in window)){toast('이 브라우저는 읽어 주기를 지원하지 않아요.');return}
+  speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='en-US';const v=pickVoice();if(v)u.voice=v;u.rate=rate;speechSynthesis.speak(u)}
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null,recBtn=null;
+function lowNorm(t){return t.replace(/[’‘`]/g,"'").toLowerCase().replace(/[.!?,]/g,' ').replace(/\s+/g,' ').trim()}
+function wordsOf(t){return lowNorm(t).replace(/\b(\d)\b/g,(m,d)=>NUM[+d]).replace(/'/g,'').split(' ').filter(Boolean)}
+function lcsMark(exp,got){const a=exp.length,b=got.length,dp=Array.from({length:a+1},()=>Array(b+1).fill(0));
+  for(let i=a-1;i>=0;i--)for(let j=b-1;j>=0;j--)dp[i][j]=exp[i]===got[j]?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
+  const hit=Array(a).fill(false);let i=0,j=0;while(i<a&&j<b){if(exp[i]===got[j]){hit[i]=true;i++;j++}else if(dp[i+1][j]>=dp[i][j+1])i++;else j++}return hit}
+function listen(expected,outEl,btn,onScore,onFail){
+  if(!SR){outEl.innerHTML='<span class="raw">이 브라우저에서는 음성 인식을 쓸 수 없어요.</span>';if(onFail)onFail('unsupported');return}
+  if(rec){try{rec.abort()}catch(e){}if(recBtn)recBtn.classList.remove('live');if(recBtn===btn){rec=null;recBtn=null;return}}
+  try{speechSynthesis.cancel()}catch(e){}
+  const r=new SR();rec=r;recBtn=btn;r.lang='en-US';r.interimResults=true;r.maxAlternatives=1;
+  btn.classList.add('live');outEl.innerHTML='<span class="raw">🎙️ 듣고 있어요… 또박또박 말해 보세요.</span>';let finalText='';
+  r.onresult=e=>{let t='';for(let k=0;k<e.results.length;k++)t+=e.results[k][0].transcript;finalText=t;outEl.innerHTML=`<span class="raw">“${esc(t)}”</span>`};
+  r.onerror=e=>{const m={'not-allowed':'마이크 사용이 막혀 있어요. 주소창의 마이크 권한을 허용해 주세요.','no-speech':'목소리가 들리지 않았어요. 다시 눌러 말해 보세요.','network':'인터넷 연결을 확인해 주세요.','audio-capture':'마이크를 찾을 수 없어요.'}[e.error]||'음성 인식에 문제가 생겼어요. 다시 해 볼까요?';
+    outEl.innerHTML=`<span class="raw">${m}</span>`;finalText='';if(onFail)onFail(e.error)};
+  r.onend=()=>{btn.classList.remove('live');rec=null;recBtn=null;if(!finalText)return;
+    const exp=wordsOf(expected),got=wordsOf(finalText),hit=lcsMark(exp,got),sc=hit.filter(Boolean).length/exp.length;
+    const msg=sc>=.9?'Perfect! 🌟':sc>=.7?'Great! 👍':'한 번 더! 🔁';
+    outEl.innerHTML=expected.replace(/[.!?]/g,'').split(' ').map((w,k)=>`<span class="w ${hit[k]?'y':'n'}">${esc(w)}</span>`).join('')+`<span class="score">${msg}</span><span class="raw">들린 말: “${esc(finalText)}”</span>`;
+    if(sc>=.9)burst(btn);if(onScore)onScore(sc)};
+  try{r.start()}catch(e){btn.classList.remove('live')}
+}
+
+/* ===================== 공용 UI ===================== */
+function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2800)}
+function burst(el){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const r=el?el.getBoundingClientRect():{left:innerWidth/2,top:innerHeight/2,width:0,height:0};const b=document.createElement('div');b.className='burst';
+  ['⭐','✨','🔎','🎉','⭐','✨','💊'].forEach(c=>{const s=document.createElement('span');s.textContent=c;s.style.left=(r.left+r.width/2)+'px';s.style.top=(r.top+r.height/2)+'px';
+    s.style.setProperty('--dx',(Math.random()*260-130)+'px');s.style.setProperty('--dy',(Math.random()*-220-40)+'px');b.appendChild(s)});
+  document.body.appendChild(b);setTimeout(()=>b.remove(),1200)}
+const sayBtn=t=>`<button class="icon" data-act="say" data-t="${esc(t)}" aria-label="듣기" title="듣기">🔊</button>`;
+const micBtn=(t,out)=>`<button class="icon mic" data-act="mic" data-t="${esc(t)}" data-out="${out}" aria-label="따라 말하기" title="따라 말하기">🎤</button>`;
+function hintBox(key,levels){const lv=S.hint[key]||0;
+  return`<div class="hintbox">${levels.slice(0,lv).map(h=>`<div class="hv">${h}</div>`).join('')}
+    <button class="hintbtn" data-act="hint" data-k="${key}" ${lv>=levels.length?'disabled':''}>💡 ${lv?'힌트 더 보기':'힌트 보기'} (${lv}/${levels.length})</button></div>`}
+/* 자리표: 칠판이 아래, 1열이 오른쪽 */
+function seatMap(cellFn){let h='<div class="seatmap"><span></span>';
+  for(let c=COLS-1;c>=0;c--)h+=`<span class="lab">${c+1}열</span>`;
+  for(let r=ROWS-1;r>=0;r--){h+=`<span class="lab">${r+1}행</span>`;for(let c=COLS-1;c>=0;c--)h+=cellFn(r*COLS+c+1)}
+  return h+'<span></span><div class="board">칠판 (앞)</div></div>'}
+
+/* ===================== 상태 (저장하지 않음) ===================== */
+const S={seat:null,codeIn:'',G:null,view:'join',hint:{},rd:{1:{marks:[],check:null,pick:null,guess:null,solved:false,wrong:0},2:{marks:[],check:null,pick:null,guess:null,solved:false,wrong:0}},
+  peek:{},res:{},rx:{habit:null,s:[null,null],delivered:false},micOff:false};
+const T={absent:[],seed:Math.floor(Math.random()*SEEDS),round:1,left:ROUND_SEC,running:false,ans:0};
+const isTeacher=()=>location.hash==='#teacher';
+
+/* ===================== 렌더 ===================== */
+const app=document.getElementById('app');
+function render(){
+  const rail=document.getElementById('rail');
+  if(isTeacher()){rail.innerHTML='';app.innerHTML=teacher();return}
+  if(S.view==='join'||!S.G){rail.innerHTML='';app.innerHTML=join();return}
+  const dr=myDetRound(S.seat);
+  rail.innerHTML=[1,2].map(r=>`<button class="dot ${S.view==='r'+r?'on':''}" data-act="view" data-v="r${r}"><i>${r}</i>${r}라운드 · ${isDet(S.seat,r)?'🩺 탐정':'🧑 주민'}</button>`).join('')+
+    `<button class="dot ${S.view==='rx'?'on':''}" data-act="view" data-v="rx"><i>💊</i>처방전</button><button class="dot ${S.view==='ms'?'on':''}" data-act="view" data-v="ms"><i>🏅</i>미션</button><button class="lvchip" data-act="leave">나는 ${S.seat}번 · 바꾸기</button>`;
+  app.innerHTML=S.view==='rx'?prescription():S.view==='ms'?missions():roundView(+S.view.slice(1));
+}
+
+/* ---------- 입장 ---------- */
+function join(){
+  const g=readCode(S.codeIn),bad=S.codeIn.replace(/\D/g,'').length>=4&&!g;
+  const conflict=g&&S.seat&&g.absent.includes(S.seat);
+  const ready=g&&S.seat&&!conflict;
+  return`<div class="head"><span class="tag">Health Detective</span><h1>🔎 미스터리 환자를 찾아라!</h1><p>ZETO 타운 건강검진 센터에 이름 없는 건강 기록지가 도착했어요. 영어로 질문해서 기록지의 주인을 찾아요!</p></div>
+  <div class="jointop">
+    <div class="card stack"><h2>① 내 자리를 눌러요</h2>
+      ${seatMap(n=>{const ab=g&&g.absent.includes(n);return`<button class="seat ${S.seat===n?'me':''} ${ab?'empty':''}" data-act="seat" data-n="${n}" aria-label="${n}번 자리">${n}</button>`})}
+      <p class="why" style="margin:0;text-align:center">${S.seat?`<b>${S.seat}번</b> 자리를 골랐어요.`:'자리를 눌러 주세요.'}</p>
+    </div>
+    <div class="card stack"><h2>② 칠판의 입장 코드를 입력해요</h2>
+      <input class="codein" id="in-code" data-in="code" inputmode="numeric" autocomplete="off" maxlength="8" value="${esc(S.codeIn)}" placeholder="0000" aria-label="입장 코드">
+      ${bad?'<div class="verdict no">코드가 맞지 않아요. 칠판의 숫자를 다시 확인해요.</div>':''}
+      ${g?`<div class="verdict ok">✅ 코드 확인! 오늘 참가 <b>${SEATS-g.absent.length}명</b>${g.absent.length?` · 빈자리 ✕ ${g.absent.join(', ')}번`:''}</div>`:''}
+      ${conflict?`<div class="verdict no">${S.seat}번은 오늘 빈자리로 되어 있어요. 내 자리가 맞는지 확인하고, 맞으면 선생님께 말해요.</div>`:''}
+      <button class="btn coral" data-act="enter" ${ready?'':'disabled'} style="font-size:19px;justify-content:center">🔎 수사 시작!</button>
+      <div class="note">🔒 <span>이름이나 기록을 어디에도 저장하지 않아요. 창을 닫으면 사라져요.</span></div>
+    </div>
+  </div>`;
+}
+
+/* ---------- 라운드 ---------- */
+function roundView(round){
+  const W=gen(S.G,round);
+  if(W.error)return`<div class="card"><h2>⚠️ ${esc(W.error)}</h2><p>선생님께 말해 주세요.</p></div>`;
+  return isDet(S.seat,round)?detective(round,W):resident(round,W);
+}
+/* ---------- 주민: 대답 확인 + 기다리는 동안 퀴즈 ---------- */
+const RES_GOAL=130,PT_ANSWER=20,PT_RETRY=10,PT_QUIZ=10;
+function resState(r){return S.res[r]||(S.res[r]={score:0,quizOK:0,quizN:0,ans:{},tries:{},pick:null,sel:[],msg:null,q:null,qPicked:null})}
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+function shuf(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+const other=p=>p==='day'?'week':'day';
+function wrongForm(n){return n===1?'one time':n===2?'two times':NUM[n]+' time'}
+function dotOpt(h,n,per){return`<span style="font-size:22px">${h.emo}</span> ${dots(n,per)}`}
+function makeQ(){
+  const h=rnd(HABITS),n=1+Math.floor(Math.random()*6),t=Math.floor(Math.random()*5);
+  if(t===0){const opts=[`${freq(n)} a ${h.per}`,`${wrongForm(n)} a ${h.per}`,`${freq(n)} a ${other(h.per)}`];
+    return{type:'횟수 표현',prompt:`${h.emo} ${h.ko}: ${perKo(h.per)} <b>${n}번</b><br>${dots(n,h.per)}<br>영어로 알맞은 것은?`,opts:shuf(opts.map((o,i)=>({html:`<span class="en">${o}</span>`,ok:i===0}))),why:`${n}번은 ${freq(n)}, ${perKo(h.per)}는 a ${h.per}!`}}
+  if(t===1){const s=aOf(h,n),alts=[[n,h.per],[n===6?5:n+1,h.per],[n,other(h.per)]];
+    return{type:'듣기',say:s,prompt:'🔊 문장을 듣고 알맞은 그림을 골라요.',opts:shuf(alts.map((a,i)=>({html:dotOpt(h,a[0],a[1]),ok:i===0}))),why:`들린 문장: ${s}`}}
+  if(t===2){const opts=[`How often do you ${h.you}?`,`How many do you ${h.you}?`,`How often you ${h.you}?`];
+    return{type:'질문 만들기',prompt:`탐정이 "${h.ko}를 얼마나 자주 하나요?"라고 물을 때 알맞은 질문은?`,opts:shuf(opts.map((o,i)=>({html:`<span class="en">${esc(o)}</span>`,ok:i===0}))),why:'얼마나 자주? → How often do you …?'}}
+  if(t===3){const bad=h.id==='fastfood'?4:1,s=aOf(h,bad),others=shuf(HABITS.filter(x=>x.id!==h.id)).slice(0,2);
+    const opts=[h.should,...others.map(x=>x.should)];
+    return{type:'처방 고르기',prompt:`환자: <span class="en">"${esc(s)}"</span><br>가장 알맞은 처방은?`,opts:shuf(opts.map((o,i)=>({html:`<span class="en">${esc(o)}</span>`,ok:i===0}))),why:h.tip}}
+  const blanks=[freq(n),wrongForm(n),n===1?'first':n===2?'second':'third'];
+  return{type:'빈칸',prompt:`<span class="en">I ${h.en} ______ a ${h.per}.</span><br>(${perKo(h.per)} ${n}번)`,opts:shuf(blanks.map((o,i)=>({html:`<span class="en">${o}</span>`,ok:i===0}))),why:`${n}번 → ${freq(n)}`};
+}
+function resident(round,W){
+  const card=W.cards[S.seat],st=resState(round);
+  if(!st.q)st.q=makeQ();
+  const peek=S.peek[round],wasTarget=W.teams.find(t=>t.target===S.seat);
+  const myDetectives=W.teams.filter(t=>t.pool.includes(S.seat)).flatMap(t=>t.members),detRow=myDetectives.length?rowOf(myDetectives[0]):null;
+  const pct=Math.min(100,Math.round(st.score/RES_GOAL*100)),done=st.score>=RES_GOAL,nAns=Object.keys(st.ans).length;
+  const q=st.q;
+  return`<div class="head"><span class="tag">Round ${round} · Resident</span><h1>🧑 나는 ZETO 타운 주민 ${S.seat}번</h1><p>${detRow!==null?`<b>${rowTxt(detRow)}</b> 탐정들이 질문하러 와요. `:''}카드를 보고 영어로 대답하고, 기다리는 동안에는 건강 퀴즈를 풀어 점수를 모아요.</p></div>
+  <div class="card stack" style="margin-bottom:16px">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">🏅 주민 미션: ${RES_GOAL}점 이상 모으기</h2><span class="timer" style="font-size:40px">${st.score}<small style="font-size:18px">점</small></span></div>
+    <div class="meter"><span style="width:${pct}%"></span></div>
+    <p class="sub" style="margin:0">${done?'🎉 <b>미션 성공!</b> 계속 대답하고 퀴즈를 풀면 보너스 점수가 쌓여요.':`🩺 탐정에게 대답 확인 +${PT_ANSWER} · 🧠 퀴즈 정답 +${PT_QUIZ} · 남은 점수 <b>${RES_GOAL-st.score}점</b>`} &nbsp;|&nbsp; 대답 ${nAns}명 · 퀴즈 ${st.quizOK}/${st.quizN}</p>
+  </div>
+  <div class="grid2">
+    <div class="stack">
+      <div class="card stack"><h2>🪪 내 주민 카드</h2>
+        <p class="sub" style="margin:0">🤫 화면은 보여 주지 말고, <b>말로만</b> 대답해요!</p>
+        <div class="idcard">${HABITS.map(h=>`<div class="hrow"><span class="emo">${h.emo}</span><span style="min-width:0"><b>${h.ko}</b><br>${dots(card[h.id],h.per)}</span><span class="n">${perKo(h.per)} ${card[h.id]}번</span></div>`).join('')}</div>
+        ${hintBox('res'+round,[
+          '👂 질문에서 이 말을 잘 들어요: '+HABITS.map(h=>`${h.emo} <b class="en">${h.id==='brush'?'teeth':h.id==='wash'?'hands':h.id==='fastfood'?'fast food':h.id}</b>`).join(' · '),
+          '대답 틀: <b class="en">I ______ ______ a day / a week.</b><br>내 횟수: '+HABITS.map(h=>`${h.emo} <b class="en">${freq(card[h.id])} a ${h.per}</b>`).join(' · '),
+          '<div class="stack" style="gap:6px">'+HABITS.map((h,i)=>`<div class="row" style="flex-wrap:nowrap;justify-content:space-between"><span class="en" style="min-width:0">${esc(aOf(h,card[h.id]))}</span><span class="row" style="flex-wrap:nowrap">${sayBtn(aOf(h,card[h.id]))}${micBtn(aOf(h,card[h.id]),'o-ra'+i)}</span></div><div class="heard" id="o-ra${i}"></div>`).join('')+'</div>'])}
+      </div>
+      <div class="card stack"><h2>🤫 혹시 내가 미스터리 환자?</h2>
+        <p class="sub" style="margin:0">라운드가 끝나고 선생님이 말하면 눌러 봐요.</p>
+        ${peek?`<div class="verdict ${wasTarget?'ok':'mid'}">${wasTarget?`🎉 맞아요! 나는 <b>${round}라운드 ${wasTarget.letter}모둠</b>의 미스터리 환자였어요. 탐정들이 처방전을 가지고 올 거예요!`:'🙂 이번에는 아니었어요. 탐정들에게 정확하게 대답해 줘서 고마워요!'}</div>`:`<button class="btn" data-act="peek" data-r="${round}">🔍 확인하기</button>`}
+      </div>
+    </div>
+    <div class="stack">
+      <div class="card stack" id="c-ans"><h2>🩺 탐정에게 대답했어요! <small class="why">+${PT_ANSWER}점</small></h2>
+        <p class="sub" style="margin:0">① 대답해 준 탐정의 자리를 누르고 ② 그 탐정이 물은 <b>습관 2개</b>를 골라요. 둘 다 맞아야 점수를 받아요.</p>
+        ${seatMap(n=>{const isD=myDetectives.includes(n),ab=S.G.absent.includes(n),got=st.ans[n],lock=!got&&(st.tries[n]||0)>=2;
+          return`<button class="seat ${ab?'empty':!isD?'off':got?'mark':st.pick===n?'pick':'res'}" ${isD&&!got&&!lock?`data-act="rpick" data-r="${round}" data-n="${n}"`:'disabled'} aria-label="${n}번">${n}${got?'<small>✓</small>':''}</button>`})}
+        ${st.pick?`<p style="margin:0"><b>${st.pick}번</b> 탐정이 물은 습관 <b>2개</b>를 골라요. (${st.sel.length}/2)</p><div class="row">${HABITS.map(h=>`<button class="pk ${st.sel.includes(h.id)?'on':''}" data-act="rhab" data-r="${round}" data-h="${h.id}">${h.emo} ${h.ko}</button>`).join('')}</div>
+          <button class="btn main sm" data-act="rok" data-r="${round}" ${st.sel.length===2?'':'disabled'}>✔ 확인</button>`:''}
+        ${st.msg?`<div class="verdict ${st.msg.ok?'ok':'no'}">${st.msg.t}</div>`:''}
+      </div>
+      <div class="card stack" id="c-quiz"><h2>🧠 기다리는 동안 건강 퀴즈 <small class="why">${q.type} · +${PT_QUIZ}점</small></h2>
+        <div class="q"><p style="margin:0;font-size:18px;line-height:1.7">${q.prompt}</p>${q.say?`<div class="row" style="margin-top:6px">${sayBtn(q.say)}<span class="why">눌러서 들어요</span></div>`:''}</div>
+        <div class="stack" style="gap:8px">${q.opts.map((o,i)=>{const p=st.qPicked;const cls=p===null?'':o.ok?'right':p===i?'wrong':'';
+          return`<button class="opt ${cls}" data-act="rquiz" data-r="${round}" data-i="${i}" ${p!==null?'disabled':''} style="text-align:left;font-size:17px">${o.html}</button>`}).join('')}</div>
+        ${st.qPicked!==null?`<div class="verdict ${q.opts[st.qPicked].ok?'ok':'mid'}">${q.opts[st.qPicked].ok?`⭕ 정답! +${PT_QUIZ}점`:'❌ 아쉬워요!'} ${esc(q.why)}</div><button class="btn main" data-act="rnext" data-r="${round}">다음 문제 →</button>`:''}
+        <p class="sub" style="margin:0">🩺 탐정이 오면 퀴즈는 잠깐 멈추고 먼저 대답해요!</p>
+      </div>
+    </div>
+  </div>`;
+}
+/* ---------- 미션 결과 ---------- */
+function missions(){
+  const rr=myDetRound(S.seat)===1?2:1,dr=myDetRound(S.seat),rs=resState(rr);
+  const m=[{ok:rs.score>=RES_GOAL,em:'🧑',t:`주민 미션 (${rr}라운드)`,d:`${RES_GOAL}점 이상 모으기 → <b>${rs.score}점</b> (대답 ${Object.keys(rs.ans).length}명 · 퀴즈 ${rs.quizOK}개)`,go:'r'+rr},
+    {ok:S.rd[dr].solved,em:'🩺',t:`탐정 미션 (${dr}라운드)`,d:S.rd[dr].solved?'모둠과 함께 미스터리 환자를 찾았어요':'모둠과 함께 미스터리 환자 찾기',go:'r'+dr},
+    {ok:S.rx.delivered,em:'💊',t:'처방 미션',d:'처방을 영어로 말하고 환자에게 전달하기',go:'rx'}];
+  const all=m.every(x=>x.ok);
+  return`<div class="head"><span class="tag">My Missions</span><h1>🏅 나의 미션 결과</h1><p>세 가지 미션을 모두 성공하면 <b>ZETO 타운 명예 건강 탐정</b>이 돼요!</p></div>
+  ${all?`<div class="reveal" style="margin-bottom:16px"><p>🎖️ 축하해요!</p><div class="num" style="font-size:40px">Honorary Health Detective</div><p>${S.seat}번 · 모든 미션 성공</p></div>`:''}
+  <div class="stack">${m.map(x=>`<div class="sline ${x.ok?'ok':''}"><div class="row" style="justify-content:space-between"><b style="font-family:var(--f-display);font-weight:400;font-size:22px">${x.em} ${x.t}</b><span style="font-size:22px">${x.ok?'✅ 성공':'⬜ 도전 중'}</span></div>
+    <span>${x.d}</span>${x.ok?'':`<button class="btn sm" data-act="view" data-v="${x.go}" style="align-self:flex-start">하러 가기 →</button>`}</div>`).join('')}</div>`;
+}
+function detective(round,W){
+  const team=W.teams.find(t=>t.members.includes(S.seat)),clue=team.clues.find(c=>c.member===S.seat),st=S.rd[round];
+  const hs=clue.habits.map(x=>({h:HB[x.habit],n:x.n}));
+  const others=team.members.filter(m=>m!==S.seat),inPool=n=>team.pool.includes(n);
+  let checkMsg='';
+  if(st.check){const c=st.check;checkMsg=c.ok?`<div class="verdict ok">✅ 완벽한 조사! 두 조각에 모두 맞는 주민은 <b>${c.n}명</b>이에요. 이제 모둠원과 모여요.</div>`
+    :`<div class="verdict mid">⚠️ <b>${c.wrong}명</b>을 다시 확인해요. 빠뜨린 사람이나 잘못 표시한 사람이 있어요. 다시 물어보고 와요!</div>`}
+  const guessMsg=st.guess&&!st.solved?`<div class="verdict no">${st.guess}</div>`:'';
+  const solvedBox=st.solved?`<div class="reveal"><p>🎉 사건 해결!</p><div class="num">${team.target}번</div><p>${round}라운드 ${team.letter}모둠의 미스터리 환자를 찾았어요!</p>
+    <p style="font-size:15px;opacity:.85;margin-top:10px">${team.clues.map(c=>`${c.member}번: ${c.habits.map(x=>`${HB[x.habit].emo}${x.n}`).join(' ')}`).join(' · ')}</p>
+    <button class="btn main" data-act="view" data-v="rx" style="margin-top:12px">💊 처방전 쓰러 가기</button></div>`:'';
+  const seatsOf=(fn)=>seatMap(n=>{const ab=S.G.absent.includes(n);if(ab)return`<button class="seat empty" disabled>${n}</button>`;return fn(n)});
+  return`<div class="head"><span class="tag">Round ${round} · Detective</span><h1>🩺 나는 탐정! <span class="hl">${team.letter}모둠</span></h1>
+    <p>${team.letter}모둠: 나(${S.seat}번)${others.map(m=>` · ${m}번`).join('')} &nbsp;|&nbsp; 📍 조사할 곳: <b>${rowTxt(team.poolRow)}</b></p></div>
+  <div class="grid2">
+    <div class="stack">
+      <div class="piece"><span class="torn" aria-hidden="true"></span>
+        <p class="sub" style="margin:0 0 8px">📄 미스터리 기록지 조각 2개 · <b>나만 알아요!</b></p>
+        ${hs.map(({h,n},k)=>`<div class="big" style="margin-top:${k?12:0}px"><span style="font-size:44px">${h.emo}</span><span><b>${h.ko}</b><br>${dots(n,h.per)}</span></div>
+          <p style="margin:4px 0 0;font-family:var(--f-display);font-size:21px">${k+1}. 환자는 ${perKo(h.per)} <span class="hl">${n}번</span> ${h.kov}.</p>`).join('')}
+        <p class="sub" style="margin:10px 0 0">두 조각에 <b>모두</b> 맞는 주민만 기억해요. 모둠원들은 다른 조각을 가지고 있어요.</p>
+      </div>
+      <div class="card stack"><h2>🗺️ 수사 방법</h2>
+        <ol class="steps">
+          <li><b>${rowTxt(team.poolRow)}</b> 주민에게 가서 <b>질문 2개</b>를 영어로 해요.</li>
+          <li>첫 질문의 대답이 다르면 두 번째 질문은 안 해도 돼요.</li>
+          <li><b>두 대답이 모두 맞는</b> 친구 번호만 기억해요.</li>
+          <li>자리로 돌아와 <b>조사 결과</b>에 ✓ 하고 확인해요.</li>
+          <li>모둠원과 모여 번호를 말해요. <span class="en">"Twelve, thirteen!"</span> 모두 겹치는 <b>단 1명</b>이 환자!</li>
+        </ol>
+        ${hintBox('det'+round,[
+          `질문의 핵심어: <b class="en">How often</b> + ${hs.map(({h})=>`<b class="en">${esc(h.you)}</b>`).join(' / ')}`,
+          `질문 틀: <b class="en">How often do you ________?</b><br>👂 기다리는 대답: ${hs.map(({h,n})=>`${h.emo} <b class="en">${freq(n)} a ${h.per}</b>`).join(' / ')}`,
+          hs.map(({h},k)=>`<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><b class="en">${esc(qOf(h))}</b><span class="row" style="flex-wrap:nowrap">${sayBtn(qOf(h))}${micBtn(qOf(h),'o-dq'+k)}</span></div><div class="heard" id="o-dq${k}"></div>`).join('')])}
+      </div>
+    </div>
+    <div class="stack">
+      ${solvedBox}
+      <div class="card stack" id="c-mark"><h2>📝 조사 결과 <small class="why">두 조각 모두 맞는 주민 ✓ (${st.marks.length}명)</small></h2>
+        ${seatsOf(n=>{const ok=inPool(n),on=st.marks.includes(n);
+          return`<button class="seat ${ok?(on?'mark':'res'):'off'} ${n===S.seat?'me':''}" ${ok?`data-act="mark" data-r="${round}" data-n="${n}"`:'disabled'} aria-label="${n}번">${n}${on?'<small>✓</small>':''}</button>`})}
+        <button class="btn main" data-act="check" data-r="${round}">✔ 내 조사 확인하기</button>
+        ${checkMsg}
+      </div>
+      ${st.solved?'':`<div class="card stack" id="c-guess"><h2>🚨 범인 지목 <small class="why">모둠 회의 후</small></h2>
+        <p class="sub" style="margin:0">모둠원 모두의 ✓에 들어 있는 주민을 골라요.</p>
+        ${seatsOf(n=>{const ok=inPool(n);return`<button class="seat ${ok?(st.pick===n?'pick':'res'):'off'}" ${ok?`data-act="pick" data-r="${round}" data-n="${n}"`:'disabled'} aria-label="${n}번">${n}</button>`})}
+        <button class="btn coral" data-act="guess" data-r="${round}" ${st.pick?'':'disabled'}>🚨 ${st.pick?st.pick+'번을 ':''}지목하기</button>
+        ${guessMsg}
+      </div>`}
+    </div>
+  </div>`;
+}
+/* ---------- 처방전 ---------- */
+function rxSentences(hid,n){const h=HB[hid];
+  return[{label:'① 진단',ko:`환자에게 말해 줘요: "당신은 ${perKo(h.per)} ${n}번 ${h.kov}."`,en:dxOf(h,n),
+      tiles:['You',h.you,freq(n),'a '+h.per+'.'],extra:['a '+(h.per==='day'?'week':'day')+'.'],
+      hints:[`핵심어: <b class="en">You</b> + <b class="en">${esc(h.you)}</b> + <b class="en">${freq(n)}</b>`,`틀: <b class="en">You ${esc(h.you)} ______ a ${h.per}.</b>`]},
+    {label:'② 처방',ko:`처방해 줘요: "${h.shouldKo}"`,en:h.should,tiles:h.tiles,extra:['can'],
+      hints:[`핵심어: <b class="en">You should</b> + <b class="en">${esc(h.key)}</b>`,`틀: <b class="en">You should ____________.</b>`]}];
+}
+function prescription(){
+  const dr=myDetRound(S.seat),W=gen(S.G,dr);
+  if(W.error)return`<div class="card"><h2>⚠️ ${esc(W.error)}</h2></div>`;
+  const team=W.teams.find(t=>t.members.includes(S.seat));
+  if(!S.rd[dr].solved)return`<div class="head"><span class="tag">Prescription</span><h1>💊 처방전은 사건을 해결하면 열려요</h1><p>나는 <b>${dr}라운드</b> 탐정이에요. 먼저 ${team.letter}모둠과 미스터리 환자를 찾아요.</p></div>
+    <button class="btn main" data-act="view" data-v="r${dr}">🔎 ${dr}라운드로 가기</button>`;
+  const P=team.target,card=W.cards[P],weak=HABITS.filter(h=>!h.good(card[h.id]));
+  const rx=S.rx,hsel=rx.habit&&HB[rx.habit];
+  let right='';
+  if(!hsel)right=`<div class="card"><h2>👈 고칠 습관 하나를 골라요</h2><p class="sub">⚠️ 표시가 있는 습관을 눌러요.</p></div>`;
+  else{
+    const sents=rxSentences(hsel.id,card[hsel.id]);
+    right=sents.map((s,i)=>sentCard(s,i)).join('');
+    if(rx.s.every(x=>x&&x.done)){
+      right+=`<div class="rx" id="rxpaper"><div class="row" style="justify-content:space-between"><span class="rxmark">℞</span><span class="en" style="font-size:15px">ZETO Town Health Center</span></div>
+        <h2>Prescription</h2><p class="en" style="margin:4px 0 10px;font-size:16px">Patient: <b>No. ${P}</b> &nbsp;·&nbsp; Doctor: <b>Team ${team.letter} · No. ${S.seat}</b></p>
+        ${sents.map(s=>`<div class="line">${esc(s.en)}</div>`).join('')}
+        ${rx.delivered?'<span class="stamp">DELIVERED</span>':''}</div>
+        <div class="card stack"><h2>🚶 처방전 전달하기</h2>
+          <p style="margin:0"><b>${P}번</b> 친구에게 가서 처방전을 영어로 읽어 줘요. 환자는 <b class="en">"Thank you, doctor!"</b>라고 대답해요.</p>
+          <div class="row">${sayBtn(sents.map(s=>s.en).join(' '))}${rx.delivered?'<span class="verdict ok">✅ 전달 완료! 수고했어요, 탐정 의사 선생님!</span>':'<button class="btn coral" data-act="deliver">✅ 전달 완료</button>'}</div></div>`;
+    }
+  }
+  return`<div class="head"><span class="tag">Prescription</span><h1>💊 미스터리 환자 ${P}번에게 처방전을 써요</h1><p>AI 건강 코치가 환자의 기록을 진단했어요. 고칠 습관 하나를 골라 <b>영어로 말해요.</b> 마이크가 안 되면 블록으로 문장을 만들어요.</p></div>
+  <div class="grid2">
+    <div class="card stack"><h2>📋 환자 기록 · 🤖 코치 진단</h2>
+      <div class="idcard">${HABITS.map(h=>{const n=card[h.id],g=h.good(n);
+        return g?`<div class="hrow goodr"><span class="emo">${h.emo}</span><span style="min-width:0"><b>${h.ko}</b> ✅<br>${dots(n,h.per)}</span><span class="n">${perKo(h.per)} ${n}번</span></div>`
+        :`<button class="hrow warn ${rx.habit===h.id?'on':''}" data-act="rxh" data-h="${h.id}"><span class="emo">${h.emo}</span><span style="min-width:0"><b>${h.ko}</b> ⚠️<br><span style="font-size:14px">${h.tip}</span></span><span class="n">${perKo(h.per)} ${n}번</span></button>`}).join('')}</div>
+      <p class="sub" style="margin:0">⚠️ 고칠 습관 ${weak.length}개 중 하나를 골라요.</p>
+    </div>
+    <div class="stack">${right}</div>
+  </div>`;
+}
+function sentCard(s,i){
+  let st=S.rx.s[i];
+  if(!st){const pool=[...s.tiles,...s.extra].map((t,k)=>({t,id:k}));for(let a=pool.length-1;a>0;a--){const b=Math.floor(Math.random()*(a+1));[pool[a],pool[b]]=[pool[b],pool[a]]}
+    st=S.rx.s[i]={done:false,tries:0,best:0,mode:S.micOff?'tile':'mic',placed:[],pool,res:'',hint:''}}
+  if(i===1&&!(S.rx.s[0]&&S.rx.s[0].done))return`<div class="sline" style="opacity:.55"><b>${s.label}</b><span class="ko">① 진단을 먼저 끝내요.</span></div>`;
+  if(st.done)return`<div class="sline ok"><b>${s.label} ✅</b><div class="done"><span class="en">${esc(s.en)}</span></div><div class="row">${sayBtn(s.en)}</div></div>`;
+  let body;
+  if(st.mode==='mic')body=`<div class="row"><button class="icon mic bigmic" data-act="rxmic" data-i="${i}" aria-label="말하기">🎤</button>
+      <span class="why">${st.tries?`도전 ${st.tries}/3 · 70% 넘으면 통과!`:'버튼을 누르고 영어로 말해요.'}</span></div>
+    <div class="heard" id="o-rx${i}">${st.res}</div>
+    <button class="linkish" data-act="rxtile" data-i="${i}">🧩 마이크가 안 돼요 → 블록으로 만들기</button>`;
+  else body=`<div class="slots">${st.placed.map((pid,k)=>`<button class="tile p" data-act="rxun" data-i="${i}" data-k="${k}">${esc(st.pool.find(p=>p.id===pid).t)}</button>`).join('')}</div>
+    <div class="row">${st.pool.map(p=>`<button class="tile ${st.placed.includes(p.id)?'used':''}" data-act="rxt" data-i="${i}" data-p="${p.id}">${esc(p.t)}</button>`).join('')}</div>
+    <div class="row"><button class="btn main sm" data-act="rxcheck" data-i="${i}">✔ 확인하기</button>${SR&&!S.micOff?`<button class="linkish" data-act="rxmicmode" data-i="${i}">🎤 말하기로 돌아가기</button>`:''}</div>
+    ${st.hint?`<div class="fb hint"><span class="bot">🤖</span><span>${esc(st.hint)}</span></div>`:''}`;
+  return`<div class="sline" id="sl${i}"><b>${s.label}</b><span class="ko">${esc(s.ko)}</span>${body}
+    ${hintBox('rx'+i+(S.rx.habit||''),[...s.hints,`<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><b class="en">${esc(s.en)}</b>${sayBtn(s.en)}</div>`])}</div>`;
+}
+
+/* ---------- 선생님 화면 ---------- */
+function teacher(){
+  const code=makeCode(T.absent,T.seed),G=readCode(code),present=SEATS-T.absent.length;
+  const mm=String(Math.floor(T.left/60)).padStart(1,'0')+':'+String(T.left%60).padStart(2,'0');
+  let roundPart='';
+  if(T.round<=2){
+    const W=gen(G,T.round),dr=detRows(T.round);
+    roundPart=W.error?`<div class="verdict no">⚠️ ${esc(W.error)}</div>`:`
+      <div class="rolebar"><div class="role d">🩺 탐정 (일어나서 질문): <b>${rowsTxt(dr)}</b></div><div class="role r">🧑 주민 (앉아서 대답): <b>${rowsTxt([0,1,2,3].filter(r=>!dr.includes(r)))}</b></div></div>
+      <div class="rolebar" style="font-size:18px">${dr.map(r=>`<div class="verdict mid" style="flex:1 1 240px">📍 <b>${r+1}행 탐정 → ${poolRow(r)+1}행 주민</b> 조사</div>`).join('')}</div>
+      <div class="teamlist">${W.teams.map(t=>`<div class="team"><b>${t.letter}모둠</b> <span class="why">${t.row+1}행 → ${t.poolRow+1}행</span><div class="mem">${t.members.join(' · ')}</div>
+        ${T.ans===T.round?`<div class="verdict ok" style="margin-top:6px;font-size:14px">환자: <b>${t.target}번</b><br>${t.clues.map(c=>c.habits.map(x=>`${HB[x.habit].emo}${x.n}`).join(' ')).join(' / ')}</div>`:''}</div>`).join('')}</div>
+      <div class="rolebar" style="font-size:15px"><div class="verdict mid" style="flex:1 1 240px">🩺 <b>탐정 미션</b>: 모둠과 함께 사건 해결 (질문 2개씩)</div><div class="verdict mid" style="flex:1 1 240px">🧑 <b>주민 미션</b>: ${RES_GOAL}점 이상 (대답 확인 +${PT_ANSWER} · 퀴즈 +${PT_QUIZ})</div></div>
+      <div class="row">${T.ans===T.round?`<button class="btn sm" data-act="tans" data-v="0">🙈 정답 숨기기</button>`:T.ans===-T.round?`<span class="confirm">학생 화면에 보이지 않게 했나요? <button class="btn sm coral" data-act="tans" data-v="${T.round}">네, 정답 보기</button> <button class="btn sm" data-act="tans" data-v="0">취소</button></span>`:`<button class="btn sm" data-act="tans" data-v="${-T.round}">🔒 정답 보기 (선생님만)</button>`}</div>`;
+  }else roundPart=`<div class="rolebar"><div class="role d">💊 처방전: 모두 자리에서 처방을 <b>영어로 말하고</b>, 환자에게 전달해요.</div></div><div class="verdict ok" style="font-size:18px">🏅 마지막에 <b>미션 탭</b>을 열어요. 주민·탐정·처방 미션 3개를 모두 성공하면 <b>명예 건강 탐정</b>!</div>`;
+  return`<div class="head"><span class="tag">Teacher</span><h1>🧑‍🏫 선생님 화면</h1><p>빈자리를 누르면 코드가 바뀌어요. 이 화면을 TV에 띄워 주세요.</p></div>
+  <div class="jointop">
+    <div class="card stack"><h2>① 오늘 빈자리를 눌러요 <small class="why">(최대 ${MAXABS}자리)</small></h2>
+      ${seatMap(n=>`<button class="seat ${T.absent.includes(n)?'empty':''}" data-act="tabs" data-n="${n}" aria-label="${n}번">${n}</button>`)}
+      <p class="why" style="margin:0;text-align:center">참가 <b>${present}명</b>${T.absent.length?` · 빈자리 ${T.absent.slice().sort((a,b)=>a-b).join(', ')}번`:''}</p>
+    </div>
+    <div class="card stack" style="justify-content:center"><h2>② 입장 코드</h2>
+      <div class="codebig">${spaced(code)}</div>
+      <p class="sub" style="margin:0;text-align:center">학생은 <b>자기 자리를 누르고</b> 이 코드를 입력해요.</p>
+      <button class="btn sm" data-act="tseed" style="align-self:center">🎲 새 사건 만들기 (반이 바뀔 때)</button>
+    </div>
+  </div>
+  <div class="card stack" style="margin-top:16px">
+    <div class="row" style="justify-content:space-between">
+      <div class="row">${[1,2,3].map(r=>`<button class="dot ${T.round===r?'on':''}" data-act="tround" data-v="${r}"><i>${r<3?r:'💊'}</i>${r<3?r+'라운드':'처방전'}</button>`).join('')}</div>
+      <div class="row"><span class="timer ${T.left<=60?'low':''}" id="tmr">${mm}</span>
+        <button class="btn sm" data-act="ttime" data-v="run">${T.running?'⏸ 멈춤':'▶ 시작'}</button><button class="btn sm" data-act="ttime" data-v="-60">−1분</button><button class="btn sm" data-act="ttime" data-v="60">+1분</button><button class="btn sm" data-act="ttime" data-v="reset">↺</button></div>
+    </div>
+    ${roundPart}
+  </div>`;
+}
+
+/* ===================== 이벤트 ===================== */
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset.in==='code'){S.codeIn=t.value.replace(/\D/g,'');const pos=t.selectionStart;render();const el=document.getElementById('in-code');if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(x){}}}});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)return;act(b.dataset.act,b.dataset,b)});
+addEventListener('hashchange',render);
+addEventListener('beforeunload',e=>{if(!isTeacher()&&S.G){e.preventDefault();e.returnValue=''}});
+let tick=null;
+function runTimer(on){T.running=on;clearInterval(tick);if(on)tick=setInterval(()=>{if(T.left>0)T.left--;else{T.running=false;clearInterval(tick);toast('⏰ 시간 끝!');render();return}
+  const el=document.getElementById('tmr');if(el){el.textContent=Math.floor(T.left/60)+':'+String(T.left%60).padStart(2,'0');el.classList.toggle('low',T.left<=60)}},1000)}
+
+function act(a,d,b){
+  switch(a){
+  /* 학생 입장 */
+  case'seat':S.seat=+d.n;render();break;
+  case'enter':{const g=readCode(S.codeIn);if(!g||!S.seat||g.absent.includes(S.seat))return;S.G=g;S.view='r1';render();scrollTo(0,0);break}
+  case'leave':S.view='join';S.G=null;render();break;
+  case'view':S.view=d.v;render();scrollTo(0,0);break;
+  case'hint':S.hint[d.k]=(S.hint[d.k]||0)+1;render();break;
+  case'say':speak(d.t);break;
+  case'mic':{const out=document.getElementById(d.out);if(out)listen(d.t,out,b);break}
+  case'peek':S.peek[+d.r]=true;render();break;
+  case'rpick':{const st=resState(+d.r);st.pick=+d.n;st.sel=[];st.msg=null;render();break}
+  case'rhab':{const st=resState(+d.r),k=st.sel.indexOf(d.h);if(k>=0)st.sel.splice(k,1);else if(st.sel.length<2)st.sel.push(d.h);render();break}
+  case'rok':{const r=+d.r,st=resState(r),W=gen(S.G,r),n=st.pick,t=W.teams.find(t=>t.members.includes(n)),c=t&&t.clues.find(c=>c.member===n);if(!c||st.sel.length!==2)break;
+    const want=c.habits.map(x=>x.habit),okk=st.sel.every(h=>want.includes(h));
+    if(okk){const pts=(st.tries[n]||0)?PT_RETRY:PT_ANSWER;st.ans[n]=true;st.score+=pts;st.msg={ok:true,t:`⭕ 맞아요! ${n}번 탐정은 ${want.map(h=>HB[h].emo+' '+HB[h].ko).join(', ')}를 물었어요. +${pts}점`};st.pick=null;st.sel=[];render();burst(document.querySelector('#c-ans .verdict'))}
+    else{st.tries[n]=(st.tries[n]||0)+1;const left=2-st.tries[n],right=st.sel.filter(h=>want.includes(h)).length;
+      st.msg={ok:false,t:left>0?`❌ 2개 중 ${right}개만 맞아요. 한 번 더 고를 수 있어요. (맞히면 +${PT_RETRY}점)`:`❌ ${n}번 탐정에게는 더 고를 수 없어요. 다음 탐정의 질문을 더 잘 들어 봐요!`};st.sel=[];if(left<=0)st.pick=null;render()}
+    break}
+  case'rquiz':{const st=resState(+d.r);if(st.qPicked!==null)break;st.qPicked=+d.i;st.quizN++;if(st.q.opts[+d.i].ok){st.quizOK++;st.score+=PT_QUIZ}render();if(st.q.opts[+d.i].ok)burst(document.querySelector('#c-quiz .opt.right'));break}
+  case'rnext':{const st=resState(+d.r);st.q=makeQ();st.qPicked=null;render();const q=st.q;if(q.say)setTimeout(()=>speak(q.say),150);break}
+  /* 탐정 */
+  case'mark':{const st=S.rd[+d.r],n=+d.n,i=st.marks.indexOf(n);if(i>=0)st.marks.splice(i,1);else st.marks.push(n);st.check=null;render();break}
+  case'check':{const r=+d.r,W=gen(S.G,r),team=W.teams.find(t=>t.members.includes(S.seat)),clue=team.clues.find(c=>c.member===S.seat),st=S.rd[r];
+    const truth=new Set(clue.matches),mine=new Set(st.marks);let wrong=0;truth.forEach(x=>{if(!mine.has(x))wrong++});mine.forEach(x=>{if(!truth.has(x))wrong++});
+    st.check={ok:wrong===0,wrong,n:truth.size};render();if(!wrong)burst(document.querySelector('#c-mark .btn'));break}
+  case'pick':S.rd[+d.r].pick=+d.n;S.rd[+d.r].guess=null;render();break;
+  case'guess':{const r=+d.r,W=gen(S.G,r),team=W.teams.find(t=>t.members.includes(S.seat)),st=S.rd[r],g=st.pick;
+    if(g===team.target){st.solved=true;st.guess=null;render();burst(document.querySelector('.reveal'));toast(`🎉 사건 해결! 미스터리 환자는 ${g}번!`)}
+    else{st.wrong++;
+      if(st.wrong===1)st.guess=`❌ ${g}번은 아니에요. 모둠원과 다시 의논해요!`;
+      else{const miss=team.clues.find(c=>!c.matches.includes(g));const x=miss.habits.find(x=>W.cards[g][x.habit]!==x.n),h=HB[x.habit];
+        st.guess=`❌ ${g}번은 아니에요. 💡 힌트: ${miss.member===S.seat?'<b>내</b>':`<b>${miss.member}번</b> 모둠원의`} ${h.emo} ${h.ko} 조각과 맞지 않아요. 그 조각을 다시 확인해요!`}
+      st.pick=null;render()}
+    break}
+  /* 처방전 */
+  case'rxh':if(S.rx.habit!==d.h){S.rx.habit=d.h;S.rx.s=[null,null];S.rx.delivered=false}render();break;
+  case'rxmic':{const i=+d.i,st=S.rx.s[i],out=document.getElementById('o-rx'+i);const P=curRx()[i];
+    listen(P.en,out,b,sc=>{st.tries++;st.best=Math.max(st.best,sc);st.res=out.innerHTML;if(sc>=.7||st.tries>=3){st.done=true;if(sc<.7)toast('3번 도전했어요! 잘했어요 💪');speak(P.en)}render();if(st.done)burst(document.getElementById('sl'+i))},
+      err=>{if(['not-allowed','service-not-allowed','audio-capture','unsupported'].includes(err)){S.micOff=true;S.rx.s.forEach(x=>{if(x&&!x.done)x.mode='tile'});render();toast('마이크를 쓸 수 없어서 블록으로 만들어요.')}});break}
+  case'rxtile':S.rx.s[+d.i].mode='tile';render();break;
+  case'rxmicmode':S.rx.s[+d.i].mode='mic';render();break;
+  case'rxt':{const st=S.rx.s[+d.i];st.placed.push(+d.p);st.hint='';render();break}
+  case'rxun':{const st=S.rx.s[+d.i];st.placed.splice(+d.k,1);st.hint='';render();break}
+  case'rxcheck':{const i=+d.i,st=S.rx.s[i],P=curRx()[i],tx=st.placed.map(pid=>st.pool.find(p=>p.id===pid).t);
+    if(tx.join(' ')===P.tiles.join(' ')){st.done=true;render();burst(document.getElementById('sl'+i));speak(P.en)}
+    else{st.tries++;let k=P.tiles.findIndex((t,j)=>tx[j]!==t);st.hint=k<0?'블록이 너무 많아요. 마지막 블록을 빼 볼까요?':tx[k]===undefined?'아직 블록이 더 필요해요.':`${k+1}번째 블록을 다시 확인해요.${k===0?' 문장은 You로 시작해요.':''}`;render()}
+    break}
+  case'deliver':S.rx.delivered=true;render();burst(document.getElementById('rxpaper'));break;
+  /* 선생님 */
+  case'tabs':{const n=+d.n,i=T.absent.indexOf(n);if(i>=0)T.absent.splice(i,1);else{if(T.absent.length>=MAXABS){toast(`빈자리는 ${MAXABS}자리까지 표시할 수 있어요.`);return}T.absent.push(n)}T.ans=0;render();break}
+  case'tseed':T.seed=(T.seed+1+Math.floor(Math.random()*(SEEDS-1)))%SEEDS;T.ans=0;render();break;
+  case'tround':T.round=+d.v;T.ans=0;runTimer(false);T.left=T.round<3?ROUND_SEC:600;render();break;
+  case'ttime':if(d.v==='run')runTimer(!T.running);else if(d.v==='reset'){runTimer(false);T.left=T.round<3?ROUND_SEC:600}else T.left=Math.max(0,T.left+(+d.v));render();break;
+  case'tans':T.ans=+d.v;render();break;
+  }
+}
+function curRx(){const dr=myDetRound(S.seat),W=gen(S.G,dr),team=W.teams.find(t=>t.members.includes(S.seat));return rxSentences(S.rx.habit,W.cards[team.target][S.rx.habit])}
+render();
+</script>
+
+</body>
+</html>
